@@ -11,7 +11,7 @@ import {
 
 // destructured props from app.js and start.js
 const Chat = ({ route, navigation, db }) => {
-    const { name, userId } = route.params;
+    const { name, userId, color } = route.params;
     const [messages, setMessages] = useState([]);
 
     // function that writes messages to firestore database
@@ -68,7 +68,7 @@ const Chat = ({ route, navigation, db }) => {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: color }]}>
             <GiftedChat
                 messages={messages}
                 onSend={(messages) => onSend(messages)}
