@@ -1,40 +1,71 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, View, KeyboardAvoidingView, Platform } from 'react-native';
-import { GiftedChat } from 'react-native-gifted-chat';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Platform, KeyboardAvoidingView } from 'react-native';
+import { GiftedChat, Bubble } from 'react-native-gifted-chat';
+import {
+    collection,
+    addDoc,
+    query,
+    orderBy,
+    onSnapshot,
+} from 'firebase/firestore';
 
-const Chat = ({ route, navigation }) => {
-    const { name } = route.params;
+// destructured props from app.js and start.js
+const Chat = ({ route, navigation, db }) => {
+    const { name, userId } = route.params;
     const [messages, setMessages] = useState([]);
+
+    // function that writes messages to firestore database
     const onSend = (newMessages) => {
-        setMessages((previousMessages) =>
-            GiftedChat.append(previousMessages, newMessages)
-        );
+        addDoc(collection(db, 'messages'), newMessages[0]);
     };
 
-    useEffect(() => {
-        setMessages([
-            {
-                _id: 1,
-                text: 'Hello developer',
-                createdAt: new Date(),
-                user: {
-                    _id: 2,
-                    name: 'React Native',
-                    avatar: 'https://placeimg.com/140/140/any',
-                },
-            },
-            {
-                _id: 2,
-                text: 'This is a system message',
-                createdAt: new Date(),
-                system: true,
-            },
-        ]);
-    }, []);
-
+    // fetches message from db in real time
     useEffect(() => {
         navigation.setOptions({ title: name });
+        const q = query(
+            collection(db, 'messages'),
+            orderBy('createdAt', 'desc')
+        );
+        const unsubMessages = onSnapshot(q, (docs) => {
+            let newMessages = [];
+            docs.forEach((doc) => {
+                newMessages.push({
+                    id: doc.id,
+                    ...doc.data(),
+                    createdAt: new Date(doc.data().createdAt.toMillis()),
+                });
+            });
+            setMessages(newMessages);
+        });
+        return () => {
+            if (unsubMessages) unsubMessages();
+        };
     }, []);
+
+    // Chat bubble bg colors
+    const renderBubble = (props) => {
+        return (
+            <Bubble
+                {...props}
+                wrapperStyle={{
+                    right: {
+                        backgroundColor: '#007aff',
+                    },
+                    left: {
+                        backgroundColor: '#E5E5EA',
+                    },
+                }}
+                textStyle={{
+                    right: {
+                        color: '#ffffff',
+                    },
+                    left: {
+                        color: '#000000',
+                    },
+                }}
+            />
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -42,12 +73,14 @@ const Chat = ({ route, navigation }) => {
                 messages={messages}
                 onSend={(messages) => onSend(messages)}
                 user={{
-                    _id: 1,
+                    _id: userId,
+                    name: name,
                 }}
+                keyboardAvoidingViewProps={{
+                    behavior: Platform.OS === 'ios' ? 'padding' : undefined,
+                }}
+                renderBubble={renderBubble}
             />
-            {Platform.OS === 'ios' ? (
-                <KeyboardAvoidingView behavior="padding" />
-            ) : null}
         </View>
     );
 };

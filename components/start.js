@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
     View,
     Text,
@@ -7,6 +8,7 @@ import {
     TouchableOpacity,
 } from 'react-native';
 
+// bg color options for UI
 const backgroundColors = {
     black: '#000000',
     grey: '#8a95a5',
@@ -16,10 +18,29 @@ const backgroundColors = {
 
 const Start = ({ navigation }) => {
     const [name, setName] = useState('');
-    const [color, setColor] = useState('');
+    const [color, setColor] = useState(backgroundColors.green);
 
+    // logs user in anonymously
+    // if user is logged in while passing in necessary parameters
     const handleStart = () => {
-        navigation.navigate('Chat', { name, color });
+        const auth = getAuth();
+        signInAnonymously(auth)
+            .then(() => {
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        const uid = user.uid;
+                        navigation.navigate('Chat', {
+                            userId: uid,
+                            name,
+                            color,
+                        });
+                    }
+                });
+            })
+            .catch((error) => {
+                // Handle errors here
+                console.error(error.message);
+            });
     };
 
     return (
