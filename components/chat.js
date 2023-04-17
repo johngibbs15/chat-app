@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Platform, KeyboardAvoidingView } from 'react-native';
-import { GiftedChat, Bubble } from 'react-native-gifted-chat';
+import { StyleSheet, View, Platform, Alert } from 'react-native';
+import { GiftedChat, Bubble, InputToolbar } from 'react-native-gifted-chat';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     collection,
     addDoc,
@@ -10,7 +11,7 @@ import {
 } from 'firebase/firestore';
 
 // destructured props from app.js and start.js
-const Chat = ({ route, navigation, db }) => {
+const Chat = ({ route, navigation, db, isConnected }) => {
     const { name, userId, color } = route.params;
     const [messages, setMessages] = useState([]);
 
@@ -22,25 +23,34 @@ const Chat = ({ route, navigation, db }) => {
     // fetches message from db in real time
     useEffect(() => {
         navigation.setOptions({ title: name });
-        const q = query(
-            collection(db, 'messages'),
-            orderBy('createdAt', 'desc')
-        );
-        const unsubMessages = onSnapshot(q, (docs) => {
-            let newMessages = [];
-            docs.forEach((doc) => {
-                newMessages.push({
-                    id: doc.id,
-                    ...doc.data(),
-                    createdAt: new Date(doc.data().createdAt.toMillis()),
+
+        if (isConnected) {
+            const q = query(collection(db, 'messages'), orderBy('createdAt', 'desc'));
+            const unsubMessages = onSnapshot(q, async (docs) => {
+                let newMessages = [];
+                docs.forEach((doc) => {
+                    newMessages.push({
+                        id: doc.id,
+                        ...doc.data(),
+                        createdAt: new Date(doc.data().createdAt.toMillis()),
+                    });
                 });
+                await AsyncStorage.setItem('messages', JSON.stringify(newMessages));
+                setMessages(newMessages);
             });
-            setMessages(newMessages);
-        });
-        return () => {
-            if (unsubMessages) unsubMessages();
-        };
-    }, []);
+            return () => {
+                if (unsubMessages) unsubMessages();
+            };
+        } else {
+            const loadCachedMessages = async () => {
+                const cachedMessages = await AsyncStorage.getItem('messages');
+                if (cachedMessages) {
+                    setMessages(JSON.parse(cachedMessages));
+                }
+            };
+            loadCachedMessages();
+        }
+    }, [isConnected]);
 
     // Chat bubble bg colors
     const renderBubble = (props) => {
@@ -67,6 +77,11 @@ const Chat = ({ route, navigation, db }) => {
         );
     };
 
+    const renderInputToolbar = (props) => {
+        if (isConnected) return <InputToolbar {...props} />;
+        else return null;
+    };
+
     return (
         <View style={[styles.container, { backgroundColor: color }]}>
             <GiftedChat
@@ -80,6 +95,7 @@ const Chat = ({ route, navigation, db }) => {
                     behavior: Platform.OS === 'ios' ? 'padding' : undefined,
                 }}
                 renderBubble={renderBubble}
+                renderInputToolbar={renderInputToolbar}
             />
         </View>
     );
