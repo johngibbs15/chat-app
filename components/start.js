@@ -38,7 +38,6 @@ const Start = ({ navigation }) => {
                 });
             })
             .catch((error) => {
-                // Handle errors here
                 console.error(error.message);
             });
     };

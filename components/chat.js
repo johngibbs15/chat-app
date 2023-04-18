@@ -9,22 +9,24 @@ import {
     orderBy,
     onSnapshot,
 } from 'firebase/firestore';
+import MapView, { Marker } from "react-native-maps";
+import CustomActions from "./CustomActions";
 
-// destructured props from app.js and start.js
-const Chat = ({ route, navigation, db, isConnected }) => {
+const Chat = ({ route, navigation, db, isConnected, storage }) => {
+     // extracting name, userId, and color from route.params and initializing messages state
     const { name, userId, color } = route.params;
     const [messages, setMessages] = useState([]);
 
-    // function that writes messages to firestore database
+    // function to add new messages to Firestore
     const onSend = (newMessages) => {
         addDoc(collection(db, 'messages'), newMessages[0]);
     };
 
-    // fetches message from db in real time
     useEffect(() => {
         navigation.setOptions({ title: name });
 
         if (isConnected) {
+            // retrieving messages from Firestore and updating the state accordingly
             const q = query(collection(db, 'messages'), orderBy('createdAt', 'desc'));
             const unsubMessages = onSnapshot(q, async (docs) => {
                 let newMessages = [];
@@ -42,6 +44,7 @@ const Chat = ({ route, navigation, db, isConnected }) => {
                 if (unsubMessages) unsubMessages();
             };
         } else {
+            // if offline, retrieving cached messages from AsyncStorage
             const loadCachedMessages = async () => {
                 const cachedMessages = await AsyncStorage.getItem('messages');
                 if (cachedMessages) {
@@ -52,7 +55,7 @@ const Chat = ({ route, navigation, db, isConnected }) => {
         }
     }, [isConnected]);
 
-    // Chat bubble bg colors
+    // styling for message bubbles
     const renderBubble = (props) => {
         return (
             <Bubble
@@ -77,9 +80,41 @@ const Chat = ({ route, navigation, db, isConnected }) => {
         );
     };
 
+    // hiding the input toolbar when offline
     const renderInputToolbar = (props) => {
         if (isConnected) return <InputToolbar {...props} />;
         else return null;
+    };
+
+    // rendering custom action buttons
+    const renderCustomActions = (props) => {
+        return <CustomActions {...props} storage={storage} userId={userId} />;
+    };
+
+    // rendering custom view for messages with a location attachment
+    const renderCustomView = (props) => {
+        const { currentMessage } = props;
+        if (currentMessage.location) {
+          return (
+            <MapView
+              style={{ width: 150, height: 100, borderRadius: 13, margin: 3 }}
+              region={{
+                latitude: currentMessage.location.latitude,
+                longitude: currentMessage.location.longitude,
+                latitudeDelta: 0.0922,
+                longitudeDelta: 0.0421,
+              }}
+            >
+              <Marker
+                coordinate={{
+                  latitude: currentMessage.location.latitude,
+                  longitude: currentMessage.location.longitude,
+                }}
+              />
+            </MapView>
+          );
+        }
+        return null;
     };
 
     return (
@@ -96,6 +131,8 @@ const Chat = ({ route, navigation, db, isConnected }) => {
                 }}
                 renderBubble={renderBubble}
                 renderInputToolbar={renderInputToolbar}
+                renderActions={renderCustomActions}
+                renderCustomView={renderCustomView}
             />
         </View>
     );
@@ -108,3 +145,4 @@ const styles = StyleSheet.create({
 });
 
 export default Chat;
+
